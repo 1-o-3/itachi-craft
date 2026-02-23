@@ -1,41 +1,9 @@
-// Initial Sample Data
-const initialData = [
-    {
-        id: 1,
-        title: "Duck Race Game",
-        url: "../duck-race/index.html",
-        category: "game",
-        desc: "アヒルたちの白熱したレース！誰が一番早いか予想してコインを増やそう。レトロなCRT風エフェクトが特徴です。",
-        image: "https://images.unsplash.com/photo-1541675154750-0444c7d51e8e?auto=format&fit=crop&w=400&q=80"
-    },
-    {
-        id: 2,
-        title: "Retro Pomodoro",
-        url: "../PomoTimer/index.html",
-        category: "tool",
-        desc: "シンプルかつ高機能なポモドーロタイマー。集中時間をカスタマイズして効率的に作業を進めましょう。",
-        image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=400&q=80"
-    },
-    {
-        id: 3,
-        title: "Itachi Art Collection",
-        url: "https://twitter.com/hashtag/いたちくらふと",
-        category: "art",
-        desc: "SNSで公開しているいたちキャラクターのアートワーク集です。最新の投稿はこちらからチェック！",
-        image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=400&q=80"
-    },
-    {
-        id: 4,
-        title: "Creative Tools v1",
-        url: "#",
-        category: "tool",
-        desc: "開発を便利にする小道具たちの詰め合わせ。現在制作中の最新バージョンです。",
-        image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=400&q=80"
-    }
-];
+// ── API Endpoints ─────────────────────────────────────────
+const API_LINKS = '/api/links';
+const API_UPLOAD = '/api/upload';
 
 // State
-let links = JSON.parse(localStorage.getItem('itachi_links')) || initialData;
+let links = [];
 let isAdmin = false;
 let editingId = null;
 let currentFilter = 'all';
@@ -59,8 +27,81 @@ const clearImageBtn = document.getElementById('clear-image');
 const imageDropZone = document.getElementById('image-drop-zone');
 const imageFileInput = document.getElementById('post-image-file');
 const imageUrlInput = document.getElementById('post-image');
+const lastUpdatedEl = document.getElementById('last-updated-date');
 
-// ── Image Preview Helper ─────────────────────────────────
+// ── Fetch links from Vercel KV ────────────────────────────
+async function fetchLinks() {
+    try {
+        const res = await fetch(API_LINKS);
+        const json = await res.json();
+        links = json.links || [];
+        updateLastUpdated();
+        renderLinks();
+    } catch (err) {
+        console.warn('API unavailable, falling back to localStorage', err);
+        // フォールバック: localStorageから読み込む
+        links = JSON.parse(localStorage.getItem('itachi_links')) || [];
+        renderLinks();
+    }
+}
+
+// ── Save links to Vercel KV ───────────────────────────────
+async function saveLinks() {
+    try {
+        await fetch(API_LINKS, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ links })
+        });
+    } catch (err) {
+        console.warn('API save failed, falling back to localStorage', err);
+        localStorage.setItem('itachi_links', JSON.stringify(links));
+    }
+    updateLastUpdated();
+}
+
+// ── Upload image to Vercel Blob ───────────────────────────
+async function uploadImageToBlob(base64, filename) {
+    try {
+        const res = await fetch(API_UPLOAD, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: filename || 'thumbnail.jpg', data: base64 })
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const json = await res.json();
+        return json.url; // Blob の公開 URL
+    } catch (err) {
+        console.warn('Blob upload failed, using base64 fallback', err);
+        return base64; // フォールバック: base64のまま使用
+    }
+}
+
+// ── Last Updated ──────────────────────────────────────────
+function updateLastUpdated() {
+    if (!lastUpdatedEl) return;
+    // すべてのリンクから最新の updatedAt を探す
+    const dates = links
+        .map(l => l.updatedAt)
+        .filter(Boolean)
+        .map(d => new Date(d))
+        .filter(d => !isNaN(d));
+
+    if (dates.length === 0) {
+        lastUpdatedEl.textContent = '情報なし';
+        return;
+    }
+    const latest = new Date(Math.max(...dates));
+    lastUpdatedEl.textContent = latest.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// ── Image Preview Helper ──────────────────────────────────
 function setImagePreview(src) {
     if (src) {
         imagePreview.src = src;
@@ -76,8 +117,8 @@ function setImagePreview(src) {
 }
 
 // 最大幅 MAX_W px にリサイズ + JPEG圧縮して Base64 を返す
-const MAX_W = 400;
-const JPEG_Q = 0.75;
+const MAX_W = 800;
+const JPEG_Q = 0.80;
 
 function compressImage(file) {
     return new Promise((resolve) => {
@@ -85,7 +126,6 @@ function compressImage(file) {
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-                // リサイズ比率を計算
                 const scale = img.width > MAX_W ? MAX_W / img.width : 1;
                 const w = Math.round(img.width * scale);
                 const h = Math.round(img.height * scale);
@@ -105,14 +145,19 @@ function compressImage(file) {
     });
 }
 
+// 画像ファイルを圧縮してプレビュー表示（Blobアップロードは投稿時に行う）
 async function handleImageFile(file) {
     if (!file || !file.type.startsWith('image/')) return;
     const base64 = await compressImage(file);
+
+    // プレビュー用にURLにセット（後で投稿時にBlobへアップロード）
     imageUrlInput.value = base64;
+    imageUrlInput.dataset.filename = file.name;
+    imageUrlInput.dataset.pendingUpload = 'true';
     setImagePreview(base64);
 }
 
-// ── Drop Zone Events ─────────────────────────────────────
+// ── Drop Zone Events ──────────────────────────────────────
 imageDropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     imageDropZone.classList.add('drag-over');
@@ -129,26 +174,29 @@ imageDropZone.addEventListener('drop', async (e) => {
     await handleImageFile(file);
 });
 
-// ── File Input ───────────────────────────────────────────
+// ── File Input ────────────────────────────────────────────
 imageFileInput.addEventListener('change', async () => {
     const file = imageFileInput.files[0];
     await handleImageFile(file);
     imageFileInput.value = '';
 });
 
-// ── URL Input (real-time preview) ────────────────────────
+// ── URL Input (real-time preview) ─────────────────────────
 imageUrlInput.addEventListener('input', () => {
     const val = imageUrlInput.value.trim();
+    imageUrlInput.dataset.pendingUpload = 'false';
     setImagePreview(val || null);
 });
 
-// ── Clear Image ──────────────────────────────────────────
+// ── Clear Image ───────────────────────────────────────────
 clearImageBtn.addEventListener('click', () => {
     imageUrlInput.value = '';
+    imageUrlInput.dataset.pendingUpload = 'false';
+    imageUrlInput.dataset.filename = '';
     setImagePreview(null);
 });
 
-// ── Render ──────────────────────────────────────────────
+// ── Render ─────────────────────────────────────────────────
 function renderLinks(category = currentFilter) {
     currentFilter = category;
     linksGrid.innerHTML = '';
@@ -175,6 +223,7 @@ function renderLinks(category = currentFilter) {
             <p class="card-desc">${link.desc}</p>
             <div class="card-footer">
                 <span class="card-link-icon"><i class="fas fa-external-link-alt"></i></span>
+                ${link.updatedAt ? `<span class="card-date">${formatDate(link.updatedAt)}</span>` : ''}
             </div>
         `;
         card.onclick = (e) => {
@@ -185,12 +234,14 @@ function renderLinks(category = currentFilter) {
     });
 }
 
-// ── Save ────────────────────────────────────────────────
-function saveLinks() {
-    localStorage.setItem('itachi_links', JSON.stringify(links));
+function formatDate(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-// ── Delete ──────────────────────────────────────────────
+// ── Delete ─────────────────────────────────────────────────
 function deleteLink(id) {
     if (confirm('このリンクを削除してもよろしいですか？')) {
         links = links.filter(l => l.id !== id);
@@ -199,7 +250,7 @@ function deleteLink(id) {
     }
 }
 
-// ── Open Edit Form ──────────────────────────────────────
+// ── Open Edit Form ─────────────────────────────────────────
 function openEditForm(id) {
     const link = links.find(l => l.id === id);
     if (!link) return;
@@ -211,6 +262,7 @@ function openEditForm(id) {
     document.getElementById('post-category').value = link.category;
     document.getElementById('post-desc').value = link.desc || '';
     imageUrlInput.value = link.image || '';
+    imageUrlInput.dataset.pendingUpload = 'false';
     setImagePreview(link.image || null);
 
     formTitle.textContent = '✏️ リンクを編集';
@@ -220,7 +272,7 @@ function openEditForm(id) {
     adminModal.style.display = 'flex';
 }
 
-// ── Reset Form ──────────────────────────────────────────
+// ── Reset Form ─────────────────────────────────────────────
 function resetForm() {
     editingId = null;
     editIdField.value = '';
@@ -228,6 +280,8 @@ function resetForm() {
     document.getElementById('post-url').value = '';
     document.getElementById('post-desc').value = '';
     imageUrlInput.value = '';
+    imageUrlInput.dataset.pendingUpload = 'false';
+    imageUrlInput.dataset.filename = '';
     setImagePreview(null);
     document.getElementById('post-category').value = 'game';
 
@@ -236,7 +290,7 @@ function resetForm() {
     cancelEdit.classList.add('hidden');
 }
 
-// ── Filters ─────────────────────────────────────────────
+// ── Filters ───────────────────────────────────────────────
 filterBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         filterBtns.forEach(b => b.classList.remove('active'));
@@ -245,7 +299,7 @@ filterBtns.forEach(btn => {
     });
 });
 
-// ── Modal open/close ─────────────────────────────────────
+// ── Modal open/close ──────────────────────────────────────
 adminLoginBtn.onclick = () => {
     if (isAdmin) {
         resetForm();
@@ -267,7 +321,7 @@ window.onclick = (e) => {
     }
 };
 
-// ── Password visibility toggle ───────────────────────────
+// ── Password visibility toggle ────────────────────────────
 document.getElementById('toggle-password').onclick = () => {
     const input = document.getElementById('admin-password');
     const icon = document.querySelector('#toggle-password i');
@@ -280,14 +334,13 @@ document.getElementById('toggle-password').onclick = () => {
     }
 };
 
-// ── Login ───────────────────────────────────────────────
+// ── Login ─────────────────────────────────────────────────
 loginSubmit.onclick = () => {
     const pass = document.getElementById('admin-password').value;
     if (pass === 'shizuokashishimizukukanbara') {
         isAdmin = true;
         loginForm.classList.add('hidden');
         postForm.classList.remove('hidden');
-        // Show admin badge on button
         adminLoginBtn.innerHTML = '<i class="fas fa-user-shield" style="color:var(--secondary)"></i>';
         renderLinks();
     } else {
@@ -296,37 +349,54 @@ loginSubmit.onclick = () => {
     }
 };
 
-// ── Post / Update ────────────────────────────────────────
-postSubmit.onclick = () => {
+// ── Post / Update ─────────────────────────────────────────
+postSubmit.onclick = async () => {
     const title = document.getElementById('post-title').value.trim();
     const url = document.getElementById('post-url').value.trim();
     const category = document.getElementById('post-category').value;
     const desc = document.getElementById('post-desc').value.trim();
-    const image = document.getElementById('post-image').value.trim();
+    let image = imageUrlInput.value.trim();
 
     if (!title || !url) {
         alert('タイトルとURLは必須です。');
         return;
     }
 
-    if (editingId !== null) {
-        // UPDATE existing
-        links = links.map(l => l.id === editingId ? { ...l, title, url, category, desc, image } : l);
-    } else {
-        // CREATE new
-        links.unshift({ id: Date.now(), title, url, category, desc, image });
+    // ボタンを無効化してアップロード中を示す
+    postSubmit.disabled = true;
+    postSubmit.textContent = '処理中...';
+
+    // Base64画像をVercel Blobにアップロード
+    if (image && imageUrlInput.dataset.pendingUpload === 'true') {
+        const filename = imageUrlInput.dataset.filename || 'thumbnail.jpg';
+        image = await uploadImageToBlob(image, filename);
     }
 
-    saveLinks();
+    const now = new Date().toISOString();
+
+    if (editingId !== null) {
+        links = links.map(l =>
+            l.id === editingId
+                ? { ...l, title, url, category, desc, image, updatedAt: now }
+                : l
+        );
+    } else {
+        links.unshift({ id: Date.now(), title, url, category, desc, image, updatedAt: now });
+    }
+
+    await saveLinks();
     renderLinks();
     resetForm();
     adminModal.style.display = 'none';
+
+    postSubmit.disabled = false;
+    postSubmit.textContent = '投稿する';
 };
 
-// ── Cancel Edit ──────────────────────────────────────────
+// ── Cancel Edit ───────────────────────────────────────────
 cancelEdit.onclick = () => {
     resetForm();
 };
 
-// ── Initial Render ───────────────────────────────────────
-renderLinks();
+// ── Initial Load ──────────────────────────────────────────
+fetchLinks();
