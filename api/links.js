@@ -1,6 +1,4 @@
-const { kv } = require('@vercel/kv');
-
-const KV_KEY = 'itachi_links';
+const { sql } = require('@vercel/postgres');
 
 const initialData = [
     {
@@ -50,23 +48,76 @@ module.exports = async function handler(req, res) {
         return res.status(200).end();
     }
 
-    if (req.method === 'GET') {
-        let links = await kv.get(KV_KEY);
-        if (!links) {
-            links = initialData;
-            await kv.set(KV_KEY, links);
-        }
-        return res.status(200).json({ links });
-    }
+    try {
+        // テーブルがなければ作成
+        await sql`
+            CREATE TABLE IF NOT EXISTS itachi_links (
+                id BIGINT PRIMARY KEY,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                category TEXT,
+                description TEXT,
+                image TEXT,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `;
 
-    if (req.method === 'POST') {
-        const { links } = req.body;
-        if (!Array.isArray(links)) {
-            return res.status(400).json({ error: 'links must be an array' });
-        }
-        await kv.set(KV_KEY, links);
-        return res.status(200).json({ ok: true });
-    }
+        if (req.method === 'GET') {
+            const result = await sql`SELECT * FROM itachi_links ORDER BY id DESC;`;
+            let links = result.rows.map(row => ({
+                id: Number(row.id),
+                title: row.title,
+                url: row.url,
+                category: row.category,
+                desc: row.description,
+                image: row.image,
+                updatedAt: row.updated_at
+            }));
 
-    return res.status(405).json({ error: 'Method not allowed' });
+            // データが空の場合は初期データを投入
+            if (links.length === 0) {
+                for (const item of initialData) {
+                    await sql`
+                        INSERT INTO itachi_links (id, title, url, category, description, image, updated_at)
+                        VALUES (${item.id}, ${item.title}, ${item.url}, ${item.category}, ${item.desc}, ${item.image}, ${item.updatedAt});
+                    `;
+                }
+                // 投入後のデータを再取得
+                const freshResult = await sql`SELECT * FROM itachi_links ORDER BY id DESC;`;
+                links = freshResult.rows.map(row => ({
+                    id: Number(row.id),
+                    title: row.title,
+                    url: row.url,
+                    category: row.category,
+                    desc: row.description,
+                    image: row.image,
+                    updatedAt: row.updated_at
+                }));
+            }
+
+            return res.status(200).json({ links });
+        }
+
+        if (req.method === 'POST') {
+            const { links } = req.body;
+            if (!Array.isArray(links)) {
+                return res.status(400).json({ error: 'links must be an array' });
+            }
+
+            // シンプルに全削除して再投入（順序と整合性を維持）
+            await sql`DELETE FROM itachi_links;`;
+            for (const link of links) {
+                await sql`
+                    INSERT INTO itachi_links (id, title, url, category, description, image, updated_at)
+                    VALUES (${link.id}, ${link.title}, ${link.url}, ${link.category}, ${link.desc}, ${link.image}, ${link.updatedAt || new Date().toISOString()});
+                `;
+            }
+            return res.status(200).json({ ok: true });
+        }
+
+        return res.status(405).json({ error: 'Method not allowed' });
+    } catch (error) {
+        console.error('Database Error:', error);
+        return res.status(500).json({ error: error.message });
+    }
 };
