@@ -1,8 +1,7 @@
-import { kv } from '@vercel/kv';
+const { kv } = require('@vercel/kv');
 
 const KV_KEY = 'itachi_links';
 
-// Initial sample data (used only when KV is empty)
 const initialData = [
     {
         id: 1,
@@ -42,8 +41,7 @@ const initialData = [
     }
 ];
 
-export default async function handler(req, res) {
-    // CORS
+module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -53,10 +51,8 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-        // リンク一覧を取得
         let links = await kv.get(KV_KEY);
         if (!links) {
-            // 初回は initialData を保存
             links = initialData;
             await kv.set(KV_KEY, links);
         }
@@ -64,7 +60,6 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        // 全リンクを上書き保存
         const { links } = req.body;
         if (!Array.isArray(links)) {
             return res.status(400).json({ error: 'links must be an array' });
@@ -74,4 +69,4 @@ export default async function handler(req, res) {
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
-}
+};

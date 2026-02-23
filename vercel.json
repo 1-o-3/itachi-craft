@@ -1,15 +1,4 @@
 {
     "name": "itachi-craft",
-    "version": 2,
-    "functions": {
-        "api/*.js": {
-            "runtime": "nodejs20.x"
-        }
-    },
-    "routes": [
-        {
-            "src": "/api/(.*)",
-            "dest": "/api/$1"
-        }
-    ]
+    "version": 2
 }
