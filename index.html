@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Itachi-Craft | Link Hub</title>
+    <meta name="description" content="Itachi-Craftの公開作品をまとめたポータルサイトです。スタイリッシュでポップなデザインで、最新の投稿をチェックできます。">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Zen+Maru+Gothic:wght@400;700&family=Yomogi&family=M+PLUS+Rounded+1c:wght@700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-wrapper">
+                <img src="assets/logo.png" alt="いたちくらふと" class="header-icon">
+                <span class="logo-text">いたちくらふと</span>
+            </div>
+            <button id="admin-login-btn" class="btn-icon"><i class="fas fa-user-shield"></i></button>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="hero">
+            <div class="hero-icon-container">
+                <img src="assets/logo.png" alt="いたちくらふと" class="hero-icon">
+                <p class="hero-brand-text">いたちくらふと</p>
+            </div>
+            <h2 class="hero-title">WORKS PORTFOLIO</h2>
+            <p class="hero-subtitle">#いたちくらふと の制作物を一挙公開中</p>
+        </section>
+
+        <nav class="filters">
+            <button class="filter-btn active" data-category="all">すべて</button>
+            <button class="filter-btn" data-category="game">ゲーム</button>
+            <button class="filter-btn" data-category="tool">制作ツール</button>
+            <button class="filter-btn" data-category="art">アート</button>
+        </nav>
+
+        <div id="links-grid" class="links-grid">
+            <!-- リンクカードがここに生成されます -->
+        </div>
+    </main>
+
+    <!-- Admin Modal -->
+    <div id="admin-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 class="modal-title">管理者ログイン</h2>
+            <div id="login-form">
+                <div class="password-wrapper">
+                    <input type="password" id="admin-password" placeholder="パスワードを入力..." class="input-field">
+                    <button type="button" id="toggle-password" class="btn-toggle-pass" title="表示/非表示">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <button id="login-submit" class="btn-primary">ログイン</button>
+                <p style="font-size: 0.7rem; color: #ccc; margin-top: 10px; text-align: center;">Hint: Address</p>
+            </div>
+            <div id="post-form" class="hidden">
+                <h3 class="form-section-title" id="form-title">新しいリンクを投稿</h3>
+                <input type="hidden" id="edit-id">
+                <input type="text" id="post-title" placeholder="タイトル" class="input-field">
+                <input type="url" id="post-url" placeholder="URL" class="input-field">
+                <select id="post-category" class="input-field">
+                    <option value="game">ゲーム</option>
+                    <option value="tool">制作ツール</option>
+                    <option value="art">アート</option>
+                </select>
+                <textarea id="post-desc" placeholder="説明 (任意)" class="input-field"></textarea>
+                <!-- 画像セクション -->
+                <div class="image-section">
+                    <p class="image-section-label"><i class="fas fa-image"></i> サムネイル画像 <span
+                            class="label-optional">(任意)</span></p>
+
+                    <!-- プレビュー -->
+                    <div class="image-preview-wrapper" id="image-preview-wrapper">
+                        <img id="image-preview" src="" alt="preview" class="image-preview hidden">
+                        <div id="image-preview-empty" class="image-preview-empty">
+                            <i class="fas fa-photo-video"></i>
+                            <span>プレビューなし</span>
+                        </div>
+                        <button type="button" id="clear-image" class="btn-clear-image hidden" title="画像をクリア">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <!-- ドロップゾーン -->
+                    <div class="image-drop-zone" id="image-drop-zone">
+                        <i class="fas fa-cloud-upload-alt drop-icon"></i>
+                        <p class="drop-text">ここに画像をドラッグ＆ドロップ</p>
+                        <p class="drop-subtext">または</p>
+                        <label for="post-image-file" class="btn-file-select">
+                            <i class="fas fa-folder-open"></i> ファイルを選択
+                        </label>
+                        <input type="file" id="post-image-file" accept="image/*" class="hidden">
+                    </div>
+
+                    <!-- URL入力 -->
+                    <div class="image-url-row">
+                        <span class="url-label"><i class="fas fa-link"></i></span>
+                        <input type="url" id="post-image" placeholder="画像URLを直接入力" class="input-field input-url">
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button id="post-submit" class="btn-primary">投稿する</button>
+                    <button id="cancel-edit" class="btn-secondary hidden">キャンセル</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2026 Itachi-Craft. All rights reserved.</p>
+    </footer>
+
+    <script src="main.js"></script>
+</body>
+
+</html>
