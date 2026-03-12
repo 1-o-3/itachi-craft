@@ -232,7 +232,7 @@ function renderLinks(category = currentFilter) {
                     <button class="btn-small btn-delete" title="削除" onclick="deleteLink(${link.id})"><i class="fas fa-trash"></i></button>
                 </div>
             ` : ''}
-            <img src="${link.image || 'https://via.placeholder.com/400x180?text=No+Image'}" alt="${link.title}" class="card-image">
+            <img src="${link.image || 'assets/no-image.png'}" alt="${link.title}" class="card-image" onerror="this.src='assets/no-image.png'">
             <div class="card-category">${link.category}</div>
             <h3 class="card-title">${link.title}</h3>
             <p class="card-desc">${link.desc}</p>
