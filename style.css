@@ -636,6 +636,23 @@ body.modal-open {
     font-size: 0.9rem;
 }
 
+.footer-link {
+    color: var(--secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.footer-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .hero-title { font-size: 2.5rem; }
