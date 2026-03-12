@@ -37,18 +37,18 @@ async function fetchLinks() {
         const res = await fetch(API_LINKS);
         const json = await res.json();
         const newLinks = json.links || [];
+        const newLastModified = json.lastModified || null;
 
-        // 差分がある場合のみ更新（編集中は避ける）
+        // 差分がある場合のみ更新
         if (JSON.stringify(newLinks) !== JSON.stringify(links)) {
             links = newLinks;
-            updateLastUpdated();
             renderLinks();
-            // LocalStorageにも同期
             localStorage.setItem('itachi_links', JSON.stringify(links));
         }
+        // lastModified は常に反映（削除でも更新される）
+        updateLastUpdated(newLastModified);
     } catch (err) {
         console.warn('API sync failed:', err);
-        // 初回ロード時のみフォールバック
         if (links.length === 0) {
             links = JSON.parse(localStorage.getItem('itachi_links')) || [];
             renderLinks();
@@ -61,17 +61,20 @@ async function fetchLinks() {
 // ── Save links to DB ───────────────────────────────────
 async function saveLinks() {
     try {
-        await fetch(API_LINKS, {
+        const res = await fetch(API_LINKS, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ links })
         });
+        const json = await res.json();
         localStorage.setItem('itachi_links', JSON.stringify(links));
+        // サーバーが返した lastModified（操作した瞬間の時刻）を表示
+        updateLastUpdated(json.lastModified || new Date().toISOString());
     } catch (err) {
         console.warn('API save failed, falling back to localStorage', err);
         localStorage.setItem('itachi_links', JSON.stringify(links));
+        updateLastUpdated(new Date().toISOString());
     }
-    updateLastUpdated();
 }
 
 // ── Upload image to Vercel Blob ───────────────────────────
@@ -92,21 +95,19 @@ async function uploadImageToBlob(base64, filename) {
 }
 
 // ── Last Updated ──────────────────────────────────────────
-function updateLastUpdated() {
+// dateStr: DBのメタテーブルから取得した最終更新日時（追加・編集・削除すべてを追跡）
+function updateLastUpdated(dateStr) {
     if (!lastUpdatedEl) return;
-    // すべてのリンクから最新の updatedAt を探す
-    const dates = links
-        .map(l => l.updatedAt)
-        .filter(Boolean)
-        .map(d => new Date(d))
-        .filter(d => !isNaN(d));
-
-    if (dates.length === 0) {
+    if (!dateStr) {
         lastUpdatedEl.textContent = '情報なし';
         return;
     }
-    const latest = new Date(Math.max(...dates));
-    lastUpdatedEl.textContent = latest.toLocaleString('ja-JP', {
+    const d = new Date(dateStr);
+    if (isNaN(d)) {
+        lastUpdatedEl.textContent = '情報なし';
+        return;
+    }
+    lastUpdatedEl.textContent = d.toLocaleString('ja-JP', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
