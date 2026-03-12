@@ -413,7 +413,7 @@ postSubmit.onclick = async () => {
     await saveLinks();
     renderLinks();
     resetForm();
-    adminModal.style.display = 'none';
+    closeModal();
 
     postSubmit.disabled = false;
     postSubmit.textContent = '投稿する';
