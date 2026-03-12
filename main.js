@@ -283,7 +283,7 @@ function openEditForm(id) {
     postSubmit.textContent = '更新する';
     cancelEdit.classList.remove('hidden');
 
-    adminModal.style.display = 'flex';
+    openModal();
 }
 
 // ── Reset Form ─────────────────────────────────────────────
@@ -314,25 +314,36 @@ filterBtns.forEach(btn => {
 });
 
 // ── Modal open/close ──────────────────────────────────────
+function openModal() {
+    adminModal.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    // iOS: スクロール位置を保存して固定
+    document.body.style.top = `-${window.scrollY}px`;
+}
+
+function closeModal() {
+    const scrollY = document.body.style.top;
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    // 閉じた後にスクロール位置を復元
+    window.scrollTo(0, -parseInt(scrollY || '0'));
+    adminModal.style.display = 'none';
+    resetForm();
+}
+
 adminLoginBtn.onclick = () => {
     if (isAdmin) {
         resetForm();
         loginForm.classList.add('hidden');
         postForm.classList.remove('hidden');
     }
-    adminModal.style.display = 'flex';
+    openModal();
 };
 
-closeModalBtn.onclick = () => {
-    adminModal.style.display = 'none';
-    resetForm();
-};
+closeModalBtn.onclick = () => closeModal();
 
 window.onclick = (e) => {
-    if (e.target === adminModal) {
-        adminModal.style.display = 'none';
-        resetForm();
-    }
+    if (e.target === adminModal) closeModal();
 };
 
 // ── Password visibility toggle ────────────────────────────
