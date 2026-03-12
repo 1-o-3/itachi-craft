@@ -1,6 +1,7 @@
-// ── API Endpoints ─────────────────────────────────────────
+// ── API Endpoints & Config ──────────────────────────────────
 const API_LINKS = '/api/links';
 const API_UPLOAD = '/api/upload';
+const POLLING_INTERVAL = 10000; // 10秒ごとに同期
 
 // State
 let links = [];
@@ -29,23 +30,35 @@ const imageFileInput = document.getElementById('post-image-file');
 const imageUrlInput = document.getElementById('post-image');
 const lastUpdatedEl = document.getElementById('last-updated-date');
 
-// ── Fetch links from Vercel KV ────────────────────────────
+// ── Fetch links from DB ──────────────────────────────────
 async function fetchLinks() {
+    if (lastUpdatedEl) lastUpdatedEl.classList.add('syncing');
     try {
         const res = await fetch(API_LINKS);
         const json = await res.json();
-        links = json.links || [];
-        updateLastUpdated();
-        renderLinks();
+        const newLinks = json.links || [];
+
+        // 差分がある場合のみ更新（編集中は避ける）
+        if (JSON.stringify(newLinks) !== JSON.stringify(links)) {
+            links = newLinks;
+            updateLastUpdated();
+            renderLinks();
+            // LocalStorageにも同期
+            localStorage.setItem('itachi_links', JSON.stringify(links));
+        }
     } catch (err) {
-        console.warn('API unavailable, falling back to localStorage', err);
-        // フォールバック: localStorageから読み込む
-        links = JSON.parse(localStorage.getItem('itachi_links')) || [];
-        renderLinks();
+        console.warn('API sync failed:', err);
+        // 初回ロード時のみフォールバック
+        if (links.length === 0) {
+            links = JSON.parse(localStorage.getItem('itachi_links')) || [];
+            renderLinks();
+        }
+    } finally {
+        if (lastUpdatedEl) lastUpdatedEl.classList.remove('syncing');
     }
 }
 
-// ── Save links to Vercel KV ───────────────────────────────
+// ── Save links to DB ───────────────────────────────────
 async function saveLinks() {
     try {
         await fetch(API_LINKS, {
@@ -53,6 +66,7 @@ async function saveLinks() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ links })
         });
+        localStorage.setItem('itachi_links', JSON.stringify(links));
     } catch (err) {
         console.warn('API save failed, falling back to localStorage', err);
         localStorage.setItem('itachi_links', JSON.stringify(links));
@@ -400,3 +414,7 @@ cancelEdit.onclick = () => {
 
 // ── Initial Load ──────────────────────────────────────────
 fetchLinks();
+
+// ── Polling ───────────────────────────────────────────────
+// 別端末での変更をリアルタイムに反映するために定期的に同期
+setInterval(fetchLinks, POLLING_INTERVAL);

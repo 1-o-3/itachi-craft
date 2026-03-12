@@ -132,6 +132,17 @@ body {
 .hero-last-updated span {
     font-weight: 600;
     color: var(--secondary);
+    transition: var(--transition);
+}
+
+.hero-last-updated span.syncing {
+    opacity: 0.5;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
 }
 
 /* Filters */
